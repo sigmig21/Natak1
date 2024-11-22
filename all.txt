@@ -1,0 +1,335 @@
+1.
+import cv2
+import numpy as np
+
+# Load the image
+image = cv2.imread(r'C:\Users\varun\Desktop\cvdl lab\McLaren_P1.jpg', cv2.IMREAD_GRAYSCALE)
+if image is None:
+    raise FileNotFoundError("Error: Image not found.")
+
+# Apply filters
+gaussian_filtered = cv2.GaussianBlur(image, (5, 5), 0)
+sobel_x = cv2.Sobel(gaussian_filtered, cv2.CV_64F, 1, 0, ksize=3)
+sobel_y = cv2.Sobel(gaussian_filtered, cv2.CV_64F, 0, 1, ksize=3)
+sobel_edges = np.uint8(255 * (np.sqrt(sobel_x**2 + sobel_y**2) / np.max(np.sqrt(sobel_x**2 + sobel_y**2))))
+median_filtered = cv2.medianBlur(gaussian_filtered, 5)
+
+# Save and display results
+cv2.imshow('gaussian_filtered.jpg', gaussian_filtered)
+cv2.waitKey(0)
+cv2.imshow('sobel_edges.jpg', sobel_edges)
+cv2.waitKey(0)
+cv2.imshow('median_filtered.jpg', median_filtered)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+2.
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage.segmentation import flood, watershed
+from skimage.filters import sobel
+from scipy.ndimage import label
+
+def show_image(img, title):
+    """Helper function to display images with titles."""
+    plt.figure(figsize=(6, 6))
+    if len(img.shape) == 3:  # If image has RGB channels
+        plt.imshow(img)
+    else:
+        plt.imshow(img, cmap='gray')
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
+
+# Load grayscale image
+image1 = cv2.imread(r'C:\Users\varun\Desktop\cvdl lab\McLaren_P1.jpg', cv2.IMREAD_GRAYSCALE)
+
+# Simple Thresholding using OpenCV
+_, simple_thresh = cv2.threshold(image1, 120, 255, cv2.THRESH_BINARY)
+
+# Region Growing using scikit-image's flood function
+seed_point = (50, 50)  # Specify a seed point
+region_grown = flood(image1, seed_point, tolerance=20)  # Grow region with tolerance
+region_grown = np.uint8(region_grown) * 255  # Convert to binary format (0 or 255)
+
+# Watershed Thresholding using scikit-image
+gradient = sobel(image1)  # Compute the gradient of the grayscale image
+scikit_markers, _ = label(image1 > 128)  # Use intensity > 128 as threshold for markers
+watershed_labels = watershed(gradient, scikit_markers)  # Apply the watershed algorithm
+
+# Normalize watershed labels for grayscale visualization
+watershed_result_scikit = (watershed_labels / watershed_labels.max() * 255).astype(np.uint8)
+
+# Display results
+titles = ["Simple Thresholding", "Region Growing", "Watershed (scikit-image - Grayscale)"]
+images = [simple_thresh, region_grown, watershed_result_scikit]
+
+for i in range(len(titles)):
+    show_image(images[i], titles[i])
+
+3.
+import cv2
+import numpy as np
+
+# Load the image
+image_path = r'C:\Users\varun\Desktop\cvdl lab\McLaren_P1.jpg'  # Change to your image path
+image = cv2.imread(image_path)
+
+
+# Apply transformations
+tx, ty = 50, 100
+sx, sy = 1.5, 1.5
+angle = 45
+center = (image.shape[1] // 2, image.shape[0] // 2)
+kx, ky = 0.5, 0.5
+
+# Transformation matrices
+translation_matrix = np.float32([[1, 0, tx], [0, 1, ty]])
+scaling_matrix = np.float32([[sx, 0, 0], [0, sy, 0]])
+rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1)
+shearing_matrix = np.float32([[1, kx, 0], [ky, 1, 0]])
+reflection_matrix = np.float32([[-1, 0, image.shape[1]], [0, 1, 0]])
+
+# Apply all transformations one by one
+transformations = [
+    ("Translation", cv2.warpAffine(image, translation_matrix, (image.shape[1], image.shape[0]))),
+    ("Scaling", cv2.warpAffine(image, scaling_matrix, (int(image.shape[1] * sx), int(image.shape[0] * sy)))),
+    ("Rotation", cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))),
+    ("Shearing", cv2.warpAffine(image, shearing_matrix, (image.shape[1], image.shape[0]))),
+    ("Reflection", cv2.warpAffine(image, reflection_matrix, (image.shape[1], image.shape[0])))
+]
+
+# Display the original and transformed images
+cv2.imshow('Original Image', image)
+
+for title, transformed_image in transformations:
+    cv2.imshow(title, transformed_image)
+    cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+
+8.
+import numpy as np
+from tensorflow.keras import layers, models
+from tensorflow.keras.datasets import cifar10
+import matplotlib.pyplot as plt
+
+# Build autoencoder
+def build_autoencoder(input_shape):
+    inp = layers.Input(input_shape)
+    x = layers.Conv2D(32, 3, activation='relu', padding='same')(inp)
+    x = layers.MaxPooling2D(2, padding='same')(x)
+    x = layers.Conv2D(16, 3, activation='relu', padding='same')(x)
+    encoded = layers.MaxPooling2D(2, padding='same')(x)
+    x = layers.Conv2D(16, 3, activation='relu', padding='same')(encoded)
+    x = layers.UpSampling2D(2)(x)
+    x = layers.Conv2D(32, 3, activation='relu', padding='same')(x)
+    x = layers.UpSampling2D(2)(x)
+    decoded = layers.Conv2D(input_shape[2], 3, activation='sigmoid', padding='same')(x)
+    return models.Model(inp, decoded)
+
+# Load the dataset
+(x_train, _), (x_test, _) = cifar10.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0  # Normalize
+
+# Add noise
+noise_factor = 0.1
+x_train_noisy = np.clip(x_train + noise_factor * np.random.normal(loc=0.0, scale=1.0, size=x_train.shape), 0.0, 1.0)
+x_test_noisy = np.clip(x_test + noise_factor * np.random.normal(loc=0.0, scale=1.0, size=x_test.shape), 0.0, 1.0)
+
+# Train autoencoder
+autoencoder = build_autoencoder(x_train.shape[1:])
+autoencoder.compile(optimizer='adam', loss='mean_squared_error')
+autoencoder.fit(x_train_noisy, x_train, epochs=5, batch_size=128)
+
+# Predict
+prediction = autoencoder.predict(x_test_noisy)
+
+# Display results
+for i in range(5):
+    plt.title("Original Image")
+    plt.imshow(x_test[i])
+    plt.show()
+    plt.title("Noisy Image")
+    plt.imshow(x_test_noisy[i])
+    plt.show()
+    plt.title("Denoised Image")
+    plt.imshow(prediction[i])
+    plt.show()
+
+
+7.
+import numpy as np
+from tensorflow.keras import models, layers
+from tensorflow.keras.utils import to_categorical
+
+# Load the dataset
+X_train = np.load(r'C:\Users\varun\Desktop\cvdl lab\pracitse\train_validation\train_gesture.npy')
+y_train = np.load(r'C:\Users\varun\Desktop\cvdl lab\pracitse\train_validation\train_gesture_labels.npy')
+X_val = np.load(r'C:\Users\varun\Desktop\cvdl lab\pracitse\train_validation\validation_gesture.npy')
+y_val = np.load(r'C:\Users\varun\Desktop\cvdl lab\pracitse\train_validation\validation_gesture_labels.npy')
+
+# Preprocess data
+min_samples = min(X_train.shape[0], y_train.shape[0])
+X_train, y_train = X_train[:min_samples] / 255.0, to_categorical(y_train[:min_samples])
+X_val, y_val = X_val[:min(X_val.shape[0], y_val.shape[0])] / 255.0, to_categorical(y_val[:min_samples])
+if len(X_train.shape) == 3:
+    X_train, X_val = X_train[..., np.newaxis], X_val[..., np.newaxis]
+
+# Build and train the model
+model = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=X_train.shape[1:]),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(y_train.shape[1], activation='softmax')
+])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=10, batch_size=64, validation_data=(X_val, y_val))
+
+# Evaluate and predict
+predictions = model.predict(X_val[:5])
+for i in range(5):
+    print(f"Predicted: {np.argmax(predictions[i])}, Actual: {np.argmax(y_val[i])}")
+
+13.
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
+import numpy as np
+
+# Load dataset
+file_path = r'C:\Users\varun\Desktop\cvdl lab\pracitse\sentiment_analysis.csv'
+data = pd.read_csv(file_path)
+
+# Select relevant columns
+texts = data['text']
+labels = data['sentiment']
+
+# Encode labels
+label_mapping = {'positive': 1, 'negative': 0, 'neutral': 2}  # Example mapping
+labels = labels.map(label_mapping)
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
+
+# Tokenization and padding
+tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+tokenizer.fit_on_texts(X_train)
+X_train_seq = tokenizer.texts_to_sequences(X_train)
+X_test_seq = tokenizer.texts_to_sequences(X_test)
+
+max_length = 100  # Max length for padding
+X_train_padded = pad_sequences(X_train_seq, maxlen=max_length, padding='post', truncating='post')
+X_test_padded = pad_sequences(X_test_seq, maxlen=max_length, padding='post', truncating='post')
+
+# Build LSTM model
+model = Sequential([
+    Embedding(input_dim=5000, output_dim=64, input_length=max_length),
+    LSTM(64, return_sequences=True),
+    Dropout(0.2),
+    LSTM(32),
+    Dropout(0.2),
+    Dense(32, activation='relu'),
+    Dense(3, activation='softmax')  # Output layer for 3 classes
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model
+model.fit(X_train_padded, y_train, epochs=5, validation_data=(X_test_padded, y_test), batch_size=32)
+
+# Predict on the test set
+y_pred = np.argmax(model.predict(X_test_padded), axis=1)
+
+# Display actual vs predicted
+actual_vs_predicted = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
+print(actual_vs_predicted.head())  # Show first 5 rows
+
+6.
+import cv2
+import numpy as np
+
+# Load Haar Cascade for face detection
+haar_cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+face_cascade = cv2.CascadeClassifier(haar_cascade_path)
+
+# Preload reference images and compute encodings
+known_faces = {
+    "Roger Federer": cv2.resize(
+        cv2.cvtColor(cv2.imread(r'C:\Users\varun\Desktop\cvdl lab\Roger_Federer 1.jpg'), cv2.COLOR_BGR2GRAY), 
+        (100, 100)
+    ),
+    "Novak Djokovic": cv2.resize(
+        cv2.cvtColor(cv2.imread(r'C:\Users\varun\Desktop\cvdl lab\Novak_Djokovic 1.jpg'), cv2.COLOR_BGR2GRAY), 
+        (100, 100)
+    )
+}
+
+# Load test image
+test_image = cv2.imread(r'C:\Users\varun\Desktop\cvdl lab\Roger_Federer 2.jpg')
+
+# Convert to grayscale and detect faces
+gray = cv2.cvtColor(test_image, cv2.COLOR_BGR2GRAY)
+faces = face_cascade.detectMultiScale(gray, 1.1, 5)
+
+# Recognize faces
+for x, y, w, h in faces:
+    face = cv2.resize(gray[y:y + h, x:x + w], (100, 100))
+    name = min(
+        known_faces.items(),
+        key=lambda item: np.linalg.norm(face - item[1]) if item[1] is not None else float("inf"),
+        default=("Unknown", None)
+    )[0]
+    cv2.rectangle(test_image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    cv2.putText(test_image, name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+# Show the result
+cv2.imshow("Face Recognition", test_image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+5.
+from ultralytics import YOLO
+import matplotlib.pyplot as plt
+import os
+import cv2
+
+data_yaml_path = r'C:\Users\varun\Desktop\cvdl lab\pracitse\data.yaml'
+raw_data = r'C:\Users\varun\Desktop\cvdl lab\pracitse\extra-20241121T065831Z-001\extra'
+
+model = YOLO('yolov8n.pt')
+
+model.train(data = data_yaml_path,epochs = 3,imgsz = 320,batch = 8,name = 'car_plate_detection')
+
+test_image_path = os.path.join(raw_data,'test.jpg')
+
+img = cv2.imread(test_image_path)
+img_rgb = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+
+results = model.predict(source = img,conf =0.3,save=True)
+result = results[0]
+
+for box in result.boxes.xyxy:
+    x1,y1,x2,y2 = map(int ,box[:4])
+    cv2.rectangle(img_rgb,(x1,y1),(x2,y2),(0,255,0),2)
+
+plt.figure(figsize=(8,6))
+plt.imshow(img_rgb)
+plt.axis('off')
+plt.title('Prediction for car plate')
+plt.show()
+
+
+
+
+
+
+
+
